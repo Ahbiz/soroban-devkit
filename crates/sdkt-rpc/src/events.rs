@@ -114,9 +114,20 @@ pub async fn get_contract_events(
         resolve_ledger_range(start_ledger, end_ledger, 0)?
     };
 
+    // The Soroban RPC `getEvents` treats `endLedger` as exclusive. Convert the
+    // user-supplied bound to inclusive by sending end + 1.
+    let request_end_ledger = match end_ledger {
+        Some(end) => Some(end.checked_add(1).ok_or_else(|| {
+            RpcError::Rpc(format!(
+                "End ledger ({end}) exceeds maximum supported ledger sequence"
+            ))
+        })?),
+        None => None,
+    };
+
     let request_body = GetEventsRequest {
         start_ledger,
-        end_ledger,
+        end_ledger: request_end_ledger,
         filters: vec![EventFilter {
             filter_type: "contract".to_string(),
             contract_ids: vec![contract_id.to_string()],
@@ -276,6 +287,26 @@ mod tests {
                 assert!(
                     msg.contains("start ledger (5000) cannot be greater than end ledger (1000)")
                 );
+            }
+            other => panic!("Unexpected error variant: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_contract_events_rejects_u32_max_end_ledger_overflow() {
+        let client = SorobanRpcClient::new("http://127.0.0.1:9999");
+        let result = get_contract_events(
+            &client,
+            "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5CWVMOMG2P3T2YYW",
+            Some(1000),
+            Some(u32::MAX),
+        )
+        .await;
+
+        let err = result.unwrap_err();
+        match err {
+            RpcError::Rpc(msg) => {
+                assert!(msg.contains("exceeds maximum supported ledger sequence"));
             }
             other => panic!("Unexpected error variant: {other:?}"),
         }
