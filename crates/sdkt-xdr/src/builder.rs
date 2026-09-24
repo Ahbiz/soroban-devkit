@@ -1593,10 +1593,65 @@ mod tests {
 
     #[test]
     fn test_contract_id_derivation_identical_between_v1_and_v2() {
+        use crate::scval_to_base64;
+
         let network_id = [42u8; 32];
         let deployer = TEST_SOURCE;
         let salt = [7u8; 20];
         let wasm_hash = [99u8; 32];
+
+        let v1_params = CreateContractParams {
+            source_account: deployer.to_string(),
+            sequence: 100,
+            fee: 50_000,
+            wasm_hash,
+            deployer_address: deployer.to_string(),
+            salt,
+        };
+        let v1_envelope = build_create_contract_tx(&v1_params).unwrap();
+
+        let arg_b64 = scval_to_base64(&ScVal::U32(42)).unwrap();
+        let v2_params = CreateContractV2Params {
+            source_account: deployer.to_string(),
+            sequence: 100,
+            fee: 50_000,
+            wasm_hash,
+            deployer_address: deployer.to_string(),
+            salt,
+            constructor_args: vec![arg_b64],
+        };
+        let v2_envelope = build_create_contract_v2_tx(&v2_params).unwrap();
+
+        let decode_env = |b64: &str| -> TransactionEnvelope {
+            let raw = STANDARD.decode(b64).unwrap();
+            let mut cursor = std::io::Cursor::new(&raw);
+            let mut l = stellar_xdr::Limited::new(&mut cursor, stellar_xdr::Limits::none());
+            TransactionEnvelope::read_xdr(&mut l).unwrap()
+        };
+
+        let v1_preimage = match decode_env(&v1_envelope) {
+            TransactionEnvelope::Tx(v1) => match &v1.tx.operations[0].body {
+                OperationBody::InvokeHostFunction(hf) => match &hf.host_function {
+                    HostFunction::CreateContract(args) => args.contract_id_preimage.clone(),
+                    _ => panic!("Expected CreateContract in V1"),
+                },
+                _ => panic!("Expected InvokeHostFunction"),
+            },
+            _ => panic!("Expected V1 envelope"),
+        };
+
+        let v2_preimage = match decode_env(&v2_envelope) {
+            TransactionEnvelope::Tx(v1) => match &v1.tx.operations[0].body {
+                OperationBody::InvokeHostFunction(hf) => match &hf.host_function {
+                    HostFunction::CreateContractV2(args) => args.contract_id_preimage.clone(),
+                    _ => panic!("Expected CreateContractV2 in V2"),
+                },
+                _ => panic!("Expected InvokeHostFunction"),
+            },
+            _ => panic!("Expected V1 envelope"),
+        };
+
+        assert_eq!(v1_preimage, v2_preimage);
 
         // Contract ID derivation is identical whether deploying via V1 or V2
         let id1 = derive_contract_id(&network_id, deployer, &salt, &wasm_hash).unwrap();

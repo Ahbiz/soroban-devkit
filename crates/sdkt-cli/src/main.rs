@@ -4220,6 +4220,8 @@ async fn async_main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Parse and validate constructor arguments (fail fast on bad input)
             let parsed_args = parse_typed_args(&arg, false)?;
+            sdkt_xdr::parse_scval_args(&parsed_args)
+                .map_err(|e| format!("Invalid constructor argument: {}", e))?;
 
             // Optional deploy guard: abort on a backwards-incompatible upgrade.
             if deny_breaking {

@@ -111,3 +111,25 @@ fn cli_deploy_validates_multiple_constructor_args_before_deploy() {
             "Identity 'nonexistent_identity' not found",
         ));
 }
+
+#[test]
+fn cli_deploy_rejects_invalid_passthrough_base64_arg_before_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let wasm_file = dir.path().join("test.wasm");
+    std::fs::write(&wasm_file, b"\0asm\x01\0\0\0").unwrap();
+
+    // Invalid base64 or invalid ScVal should fail immediately before looking up identity
+    sdkt(dir.path())
+        .args([
+            "deploy",
+            "--wasm",
+            wasm_file.to_str().unwrap(),
+            "--identity",
+            "nonexistent_identity",
+            "--arg",
+            "not_valid_scval_base64!?",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Invalid constructor argument"));
+}

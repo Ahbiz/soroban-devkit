@@ -269,6 +269,7 @@ See [`docs/plugin-authoring.md`](docs/plugins/plugin-authoring.md) for how to bu
 | `sdkt diff` | Offline comparison of WASM binaries and API surfaces. |
 | `sdkt diff --old-wasm <A> --new-wasm <B>` | Offline ABI/function/event/type diff of two WASM files. Add `--upgrade-safety` for a breaking-change verdict. |
 | `sdkt build` | Compile workspace rust contracts into optimized WASMs. |
+| `sdkt deploy --wasm <file> [--salt <salt>] [--arg <type:value>...]` | Upload WASM + instantiate. Salt is auto-generated if omitted (see [Deploy a single contract](#deploy-a-single-contract) below). Pass constructor arguments via repeated `--arg type:value` flags (uses `CreateContractV2`). Add `--deny-breaking --old-wasm <deployed.wasm>` to abort on a non-backwards-compatible upgrade. |
 | `sdkt project deploy` | Deploy multi-contract workspace orchestrating topological dependency sorting. |
 | `sdkt verify --contract <ID> [--wasm <file>] [--network <net>]` | Verify a deployed contract matches a local WASM (offline hash vs on-chain hash). |
 | `sdkt health --contract <ID> [--wasm <file>] [--network <net>]` | Unified read-only contract posture report (WASM, storage, TTL, health verdict). |
@@ -477,7 +478,6 @@ The lock file (`sdkt.lock`) records each dependency's source, git URL,
 requested reference, and resolved commit SHA (when available), so fetches are
 reproducible. Local path deps remain unchanged in the lock.
 
-| `sdkt deploy --wasm <file> [--salt <salt>] [--arg <type:value>...]` | Upload WASM + instantiate. Salt is auto-generated if omitted (see [Deploy a single contract](#deploy-a-single-contract) below). Pass constructor arguments via repeated `--arg type:value` flags (uses `CreateContractV2`). Add `--deny-breaking --old-wasm <deployed.wasm>` to abort on a non-backwards-compatible upgrade. |
 ### Network profiles
 
 Save an RPC endpoint once and reference it from any RPC command instead of

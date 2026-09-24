@@ -436,6 +436,10 @@ pub async fn deploy_contract_with_args(
         return Err(RpcError::Rpc("WASM bytes are empty".into()));
     }
 
+    // Validate constructor arguments early before uploading WASM
+    sdkt_xdr::parse_scval_args(&constructor_args)
+        .map_err(|e| RpcError::Rpc(format!("Invalid constructor argument: {}", e)))?;
+
     // Parse WASM hash
     let meta = sdkt_wasm::parse_metadata(wasm_bytes)
         .map_err(|e| RpcError::Rpc(format!("Failed to parse WASM metadata: {}", e)))?;
@@ -786,5 +790,30 @@ mod tests {
 
         let default_args = CreateContractArgs::default();
         assert!(default_args.constructor_args.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_deploy_contract_with_invalid_constructor_args_fails_before_upload() {
+        let client = SorobanRpcClient::new("http://127.0.0.1:9999");
+        let signer = Ed25519Signer::from_seed(&[1u8; 32]);
+        let wasm = b"\0asm\x01\0\0\0";
+        let res = deploy_contract_with_args(
+            &client,
+            wasm,
+            "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            &signer,
+            Network::Testnet,
+            None,
+            vec!["not_valid_base64_scval".into()],
+        )
+        .await;
+
+        let err = res.unwrap_err();
+        match err {
+            RpcError::Rpc(msg) => {
+                assert!(msg.contains("Invalid constructor argument"));
+            }
+            other => panic!("Unexpected error variant: {other:?}"),
+        }
     }
 }
